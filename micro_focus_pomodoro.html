@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微光時光機 - Micro-Focus Pomodoro & Ambient Sound</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Plus Jakarta Sans & Noto Sans TC -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            900: '#134e4a',
+                        },
+                        darkbg: '#0b0f19',
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'Noto Sans TC', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* 深色毛玻璃與質感細節 */
+        body {
+            background: radial-gradient(circle at 50% 20%, #1e293b 0%, #0b0f19 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+            font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.45);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(20, 184, 166, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* 圓形進度條 CSS 動畫 transition */
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        /* 音訊滑桿客製化 */
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            height: 6px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #14b8a6;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(20, 184, 166, 0.5);
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* 流光微光效果 */
+        .ambient-glow {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(20, 184, 166, 0.15) 0%, rgba(0,0,0,0) 70%);
+            pointer-events: none;
+            z-index: 0;
+            animation: pulseGlow 8s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulseGlow {
+            0% { transform: scale(1) translate(-20px, -20px); opacity: 0.5; }
+            100% { transform: scale(1.3) translate(20px, 20px); opacity: 0.8; }
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen relative selection:bg-teal-500 selection:text-white">
+
+    <!-- 背景動態光暈 -->
+    <div class="ambient-glow top-10 left-10"></div>
+    <div class="ambient-glow bottom-10 right-10" style="animation-delay: -4s; background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, rgba(0,0,0,0) 70%);"></div>
+
+    <!-- 頂部導覽 -->
+    <header class="w-full max-w-5xl mx-auto px-6 py-6 flex justify-between items-center z-10">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
+                <i class="fa-solid fa-hourglass-half text-white text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-teal-200">微光時光機</h1>
+                <p class="text-xs text-slate-400">Micro-Focus & Ambient Sound</p>
+            </div>
+        </div>
+
+        <!-- 全螢幕與設定快捷 -->
+        <div class="flex items-center gap-3">
+            <button id="fullscreen-btn" title="切換全螢幕" class="w-10 h-10 rounded-xl glass-card flex items-center justify-center text-slate-300 hover:text-white transition">
+                <i class="fa-solid fa-expand"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主體內容區 -->
+    <main class="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 py-4 grid grid-cols-1 lg:grid-cols-12 gap-8 z-10 items-start">
+        
+        <!-- 左側：番茄鐘計時器 -->
+        <section class="lg:col-span-7 glass-panel rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center relative overflow-hidden">
+            <!-- 模式切換鈕 -->
+            <div class="flex bg-slate-900/60 p-1.5 rounded-2xl border border-white/5 mb-8 w-full max-w-xs justify-between">
+                <button id="mode-work" class="flex-1 py-2 text-xs font-semibold rounded-xl transition-all duration-300 bg-teal-500 text-white shadow-md shadow-teal-500/20">專注 (25m)</button>
+                <button id="mode-short" class="flex-1 py-2 text-xs font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-300">短休 (5m)</button>
+                <button id="mode-long" class="flex-1 py-2 text-xs font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-300">長休 (15m)</button>
+            </div>
+
+            <!-- 圓形倒數計時器 -->
+            <div class="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center my-2">
+                <svg class="w-full h-full" viewBox="0 0 200 200">
+                    <!-- 背景軌道 -->
+                    <circle class="text-slate-800" stroke-width="8" stroke="currentColor" fill="transparent" r="88" cx="100" cy="100" />
+                    <!-- 動態進度條 -->
+                    <circle id="progress-circle" class="progress-ring__circle text-teal-500" stroke-width="8" stroke-dasharray="552.92" stroke-dashoffset="0" stroke-linecap="round" stroke="currentColor" fill="transparent" r="88" cx="100" cy="100" />
+                </svg>
+
+                <div class="absolute flex flex-col items-center text-center">
+                    <span id="timer-display" class="text-5xl sm:text-6xl font-bold tracking-tighter text-white font-mono">25:00</span>
+                    <span id="status-label" class="text-xs uppercase tracking-widest text-teal-400 mt-2 font-semibold">專注時間</span>
+                </div>
+            </div>
+
+            <!-- 控制按鈕 -->
+            <div class="flex items-center gap-4 mt-8">
+                <button id="start-btn" class="px-8 py-3.5 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white font-semibold rounded-2xl shadow-lg shadow-teal-500/25 transition-all duration-200 active:scale-95 flex items-center gap-2">
+                    <i class="fa-solid fa-play text-sm"></i>
+                    <span id="start-btn-text">開始專注</span>
+                </button>
+                <button id="reset-btn" class="p-3.5 glass-card text-slate-300 hover:text-white rounded-2xl transition active:scale-95" title="重設">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+
+            <!-- 今日專注次數統計 -->
+            <div class="mt-8 pt-6 border-t border-white/5 w-full flex justify-around text-center">
+                <div>
+                    <div class="text-xs text-slate-400">已完成番茄</div>
+                    <div id="completed-count" class="text-xl font-bold text-teal-400 mt-1">0</div>
+                </div>
+                <div class="border-r border-white/5"></div>
+                <div>
+                    <div class="text-xs text-slate-400">總專注時長</div>
+                    <div id="total-time-display" class="text-xl font-bold text-white mt-1">0 分鐘</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 右側：環境音效播放器 (Web Audio API 原生合成) -->
+        <section class="lg:col-span-5 flex flex-col gap-4">
+            <div class="glass-panel rounded-3xl p-6">
+                <div class="flex items-center justify-between mb-5">
+                    <div class="flex items-center gap-2.5">
+                        <i class="fa-solid fa-sliders text-teal-400"></i>
+                        <h2 class="font-semibold text-lg text-white">環境原聲 (Web Audio API)</h2>
+                    </div>
+                    <button id="master-mute" class="text-xs text-slate-400 hover:text-teal-400 transition">
+                        <i class="fa-solid fa-volume-high mr-1"></i>全部靜音
+                    </button>
+                </div>
+                <p class="text-xs text-slate-400 mb-6">點擊圖示開啟聲軌，滑動調節混音比例。純程式即時合成，免載入音訊檔。</p>
+
+                <!-- 音效列表 -->
+                <div class="space-y-4">
+                    <!-- 1. 雨聲 (Rain) -->
+                    <div class="glass-card rounded-2xl p-4 flex items-center gap-4">
+                        <button class="sound-toggle w-11 h-11 rounded-xl bg-slate-800 text-slate-400 flex items-center justify-center hover:text-teal-400 transition" data-sound="rain">
+                            <i class="fa-solid fa-cloud-showers-heavy text-lg"></i>
+                        </button>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-medium text-slate-200">窗外細雨</span>
+                                <span class="sound-val text-xs text-slate-400 font-mono">0%</span>
+                            </div>
+                            <input type="range" class="sound-slider w-full" data-sound="rain" min="0" max="100" value="0">
+                        </div>
+                    </div>
+
+                    <!-- 2. 篝火 (Fireplace) -->
+                    <div class="glass-card rounded-2xl p-4 flex items-center gap-4">
+                        <button class="sound-toggle w-11 h-11 rounded-xl bg-slate-800 text-slate-400 flex items-center justify-center hover:text-amber-400 transition" data-sound="fire">
+                            <i class="fa-solid fa-fire text-lg"></i>
+                        </button>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-medium text-slate-200">溫暖篝火</span>
+                                <span class="sound-val text-xs text-slate-400 font-mono">0%</span>
+                            </div>
+                            <input type="range" class="sound-slider w-full" data-sound="fire" min="0" max="100" value="0">
+                        </div>
+                    </div>
+
+                    <!-- 3. 白噪音/風聲 (White Noise / Wind) -->
+                    <div class="glass-card rounded-2xl p-4 flex items-center gap-4">
+                        <button class="sound-toggle w-11 h-11 rounded-xl bg-slate-800 text-slate-400 flex items-center justify-center hover:text-indigo-400 transition" data-sound="wind">
+                            <i class="fa-solid fa-wind text-lg"></i>
+                        </button>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-medium text-slate-200">平靜柔風</span>
+                                <span class="sound-val text-xs text-slate-400 font-mono">0%</span>
+                            </div>
+                            <input type="range" class="sound-slider w-full" data-sound="wind" min="0" max="100" value="0">
+                        </div>
+                    </div>
+
+                    <!-- 4. 靜謐宇宙 (Pink/Brown Noise Low frequency) -->
+                    <div class="glass-card rounded-2xl p-4 flex items-center gap-4">
+                        <button class="sound-toggle w-11 h-11 rounded-xl bg-slate-800 text-slate-400 flex items-center justify-center hover:text-purple-400 transition" data-sound="space">
+                            <i class="fa-solid fa-user-astronaut text-lg"></i>
+                        </button>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-medium text-slate-200">深空低吟</span>
+                                <span class="sound-val text-xs text-slate-400 font-mono">0%</span>
+                            </div>
+                            <input type="range" class="sound-slider w-full" data-sound="space" min="0" max="100" value="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 頁尾 -->
+    <footer class="w-full max-w-5xl mx-auto px-6 py-6 text-center text-xs text-slate-500 z-10">
+        <p>微光時光機 © 2026 | Created with Vibe Coding & Web Audio API</p>
+    </footer>
+
+    <!-- JavaScript 邏輯 -->
+    <script>
+        // --- 1. 番茄鐘邏輯 (Pomodoro State) ---
+        const MODES = {
+            work: { name: '專注時間', duration: 25 * 60, color: 'text-teal-500', bgBtn: 'bg-teal-500' },
+            short: { name: '短暫休息', duration: 5 * 60, color: 'text-sky-400', bgBtn: 'bg-sky-500' },
+            long: { name: '長時休息', duration: 15 * 60, color: 'text-indigo-400', bgBtn: 'bg-indigo-500' }
+        };
+
+        let currentMode = 'work';
+        let timeLeft = MODES.work.duration;
+        let timerInterval = null;
+        let isRunning = false;
+        let completedPomodoros = 0;
+        let totalFocusSeconds = 0;
+
+        // DOM 元素
+        const timerDisplay = document.getElementById('timer-display');
+        const statusLabel = document.getElementById('status-label');
+        const startBtn = document.getElementById('start-btn');
+        const startBtnText = document.getElementById('start-btn-text');
+        const resetBtn = document.getElementById('reset-btn');
+        const progressCircle = document.getElementById('progress-circle');
+        const completedCountEl = document.getElementById('completed-count');
+        const totalTimeDisplay = document.getElementById('total-time-display');
+
+        const modeWorkBtn = document.getElementById('mode-work');
+        const modeShortBtn = document.getElementById('mode-short');
+        const modeLongBtn = document.getElementById('mode-long');
+
+        const CIRCLE_RADIUS = 88;
+        const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * CIRCLE_RADIUS;
+
+        // 初始化圓形進度條
+        progressCircle.style.strokeDasharray = `${CIRCLE_CIRCUMFERENCE} ${CIRCLE_CIRCUMFERENCE}`;
+
+        function updateDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            timerDisplay.textContent = formattedTime;
+            document.title = `${formattedTime} - ${MODES[currentMode].name} | 微光時光機`;
+
+            // 計算圓形進度
+            const totalDuration = MODES[currentMode].duration;
+            const progress = (totalDuration - timeLeft) / totalDuration;
+            const offset = CIRCLE_CIRCUMFERENCE - (progress * CIRCLE_CIRCUMFERENCE);
+            progressCircle.style.strokeDashoffset = offset;
+        }
+
+        function setMode(mode) {
+            clearInterval(timerInterval);
+            isRunning = false;
+            currentMode = mode;
+            timeLeft = MODES[mode].duration;
+            statusLabel.textContent = MODES[mode].name;
+
+            // UI 狀態切換
+            [modeWorkBtn, modeShortBtn, modeLongBtn].forEach(btn => {
+                btn.className = "flex-1 py-2 text-xs font-semibold rounded-xl text-slate-400 hover:text-white transition-all duration-300";
+            });
+
+            const activeBtn = mode === 'work' ? modeWorkBtn : (mode === 'short' ? modeShortBtn : modeLongBtn);
+            activeBtn.className = `flex-1 py-2 text-xs font-semibold rounded-xl transition-all duration-300 ${MODES[mode].bgBtn} text-white shadow-md`;
+
+            // 進度條顏色
+            progressCircle.className.baseVal = `progress-ring__circle ${MODES[mode].color}`;
+
+            startBtnText.textContent = '開始';
+            startBtn.querySelector('i').className = 'fa-solid fa-play text-sm';
+            updateDisplay();
+        }
+
+        function toggleTimer() {
+            // 初始化 Web Audio API (受瀏覽器 Autoplay 政策限制，需使用者互動啟動)
+            initAudioContext();
+
+            if (isRunning) {
+                // 暫停
+                clearInterval(timerInterval);
+                isRunning = false;
+                startBtnText.textContent = '繼續';
+                startBtn.querySelector('i').className = 'fa-solid fa-play text-sm';
+            } else {
+                // 開始
+                isRunning = true;
+                startBtnText.textContent = '暫停';
+                startBtn.querySelector('i').className = 'fa-solid fa-pause text-sm';
+
+                timerInterval = setInterval(() => {
+                    if (timeLeft > 0) {
+                        timeLeft--;
+                        if (currentMode === 'work') {
+                            totalFocusSeconds++;
+                            updateStatsDisplay();
+                        }
+                        updateDisplay();
+                    } else {
+                        // 時間到
+                        clearInterval(timerInterval);
+                        isRunning = false;
+                        playNotificationSound();
+
+                        if (currentMode === 'work') {
+                            completedPomodoros++;
+                            completedCountEl.textContent = completedPomodoros;
+                            alert("🎉 太棒了！完成了一個專注週期，休息一下吧！");
+                            setMode('short');
+                        } else {
+                            alert("☕ 休息結束，準備好開始下一個專注週期了嗎？");
+                            setMode('work');
+                        }
+                    }
+                }, 1000);
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            timeLeft = MODES[currentMode].duration;
+            startBtnText.textContent = '開始';
+            startBtn.querySelector('i').className = 'fa-solid fa-play text-sm';
+            updateDisplay();
+        }
+
+        function updateStatsDisplay() {
+            const mins = Math.floor(totalFocusSeconds / 60);
+            totalTimeDisplay.textContent = `${mins} 分鐘`;
+        }
+
+        modeWorkBtn.addEventListener('click', () => setMode('work'));
+        modeShortBtn.addEventListener('click', () => setMode('short'));
+        modeLongBtn.addEventListener('click', () => setMode('long'));
+        startBtn.addEventListener('click', toggleTimer);
+        resetBtn.addEventListener('click', resetTimer);
+
+        // --- 2. Web Audio API 音效合成器 (無須外部 MP3) ---
+        let audioCtx = null;
+        const soundNodes = {
+            rain: { gain: null, source: null },
+            fire: { gain: null, source: null },
+            wind: { gain: null, source: null },
+            space: { gain: null, source: null }
+        };
+
+        function initAudioContext() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                setupAudioGenerators();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // 生成白噪音 / 粉紅噪音 Buffer
+        function createNoiseBuffer(type = 'white') {
+            const bufferSize = audioCtx.sampleRate * 2; // 2 秒循環
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const output = buffer.getChannelData(0);
+            let lastOut = 0.0;
+
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                if (type === 'pink') {
+                    // 簡單粉紅噪音濾波近似
+                    output[i] = (lastOut + (0.02 * white)) / 1.02;
+                    lastOut = output[i];
+                    output[i] *= 3.5; 
+                } else {
+                    output[i] = white;
+                }
+            }
+            return buffer;
+        }
+
+        function setupAudioGenerators() {
+            const noiseBuffer = createNoiseBuffer('white');
+            const pinkBuffer = createNoiseBuffer('pink');
+
+            // 1. 雨聲合成 (高通濾波粉紅噪音 + 隨機脈衝)
+            const rainSource = audioCtx.createBufferSource();
+            rainSource.buffer = pinkBuffer;
+            rainSource.loop = true;
+            const rainFilter = audioCtx.createBiquadFilter();
+            rainFilter.type = 'lowpass';
+            rainFilter.frequency.value = 1000;
+            const rainGain = audioCtx.createGain();
+            rainGain.gain.value = 0;
+            rainSource.connect(rainFilter);
+            rainFilter.connect(rainGain);
+            rainGain.connect(audioCtx.destination);
+            rainSource.start();
+            soundNodes.rain.gain = rainGain;
+
+            // 2. 篝火聲音合成 (低通粉紅噪音 + 頻率調變)
+            const fireSource = audioCtx.createBufferSource();
+            fireSource.buffer = noiseBuffer;
+            fireSource.loop = true;
+            const fireFilter = audioCtx.createBiquadFilter();
+            fireFilter.type = 'bandpass';
+            fireFilter.frequency.value = 400;
+            fireFilter.Q.value = 3;
+            const fireGain = audioCtx.createGain();
+            fireGain.gain.value = 0;
+            fireSource.connect(fireFilter);
+            fireFilter.connect(fireGain);
+            fireGain.connect(audioCtx.destination);
+            fireSource.start();
+            soundNodes.fire.gain = fireGain;
+
+            // 3. 風聲合成 (帶通濾波 + LFO 緩慢起伏)
+            const windSource = audioCtx.createBufferSource();
+            windSource.buffer = pinkBuffer;
+            windSource.loop = true;
+            const windFilter = audioCtx.createBiquadFilter();
+            windFilter.type = 'bandpass';
+            windFilter.frequency.value = 300;
+            windFilter.Q.value = 2;
+
+            // LFO 風聲起伏
+            const lfo = audioCtx.createOscillator();
+            lfo.frequency.value = 0.2; // 0.2Hz 緩慢搖擺
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 200;
+            lfo.connect(lfoGain);
+            lfoGain.connect(windFilter.frequency);
+            lfo.start();
+
+            const windGain = audioCtx.createGain();
+            windGain.gain.value = 0;
+            windSource.connect(windFilter);
+            windFilter.connect(windGain);
+            windGain.connect(audioCtx.destination);
+            windSource.start();
+            soundNodes.wind.gain = windGain;
+
+            // 4. 深空低吟 (超低頻鋸齒波 + 低通濾波)
+            const spaceOsc = audioCtx.createOscillator();
+            spaceOsc.type = 'sine';
+            spaceOsc.frequency.value = 55; // A1 低音
+            const spaceFilter = audioCtx.createBiquadFilter();
+            spaceFilter.type = 'lowpass';
+            spaceFilter.frequency.value = 120;
+            const spaceGain = audioCtx.createGain();
+            spaceGain.gain.value = 0;
+            spaceOsc.connect(spaceFilter);
+            spaceFilter.connect(spaceGain);
+            spaceGain.connect(audioCtx.destination);
+            spaceOsc.start();
+            soundNodes.space.gain = spaceGain;
+        }
+
+        // 音效提醒 (計時結束)
+        function playNotificationSound() {
+            if (!audioCtx) initAudioContext();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+            osc.frequency.exponentialRampToValueAtTime(659.25, audioCtx.currentTime + 0.3); // E5
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.8);
+        }
+
+        // 音量控制事件綁定
+        document.querySelectorAll('.sound-slider').forEach(slider => {
+            slider.addEventListener('input', (e) => {
+                initAudioContext();
+                const soundType = e.target.dataset.sound;
+                const val = parseInt(e.target.value);
+                const parent = e.target.closest('.glass-card');
+                const valDisplay = parent.querySelector('.sound-val');
+                const toggleBtn = parent.querySelector('.sound-toggle');
+
+                valDisplay.textContent = `${val}%`;
+
+                // 換算成 0.0 ~ 0.5 的 Gain 值
+                const targetGain = (val / 100) * 0.4;
+                if (soundNodes[soundType] && soundNodes[soundType].gain) {
+                    soundNodes[soundType].gain.gain.setTargetAtTime(targetGain, audioCtx.currentTime, 0.05);
+                }
+
+                // 變更按鈕高亮狀態
+                if (val > 0) {
+                    toggleBtn.classList.add('bg-teal-500/20', 'text-teal-400');
+                    toggleBtn.classList.remove('bg-slate-800', 'text-slate-400');
+                } else {
+                    toggleBtn.classList.remove('bg-teal-500/20', 'text-teal-400');
+                    toggleBtn.classList.add('bg-slate-800', 'text-slate-400');
+                }
+            });
+        });
+
+        // 開關按鈕點擊事件 (快速開/關)
+        document.querySelectorAll('.sound-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                initAudioContext();
+                const soundType = btn.dataset.sound;
+                const parent = btn.closest('.glass-card');
+                const slider = parent.querySelector('.sound-slider');
+                
+                if (parseInt(slider.value) > 0) {
+                    slider.value = 0;
+                } else {
+                    slider.value = 50;
+                }
+                slider.dispatchEvent(new Event('input'));
+            });
+        });
+
+        // 主靜音鈕
+        document.getElementById('master-mute').addEventListener('click', () => {
+            document.querySelectorAll('.sound-slider').forEach(slider => {
+                slider.value = 0;
+                slider.dispatchEvent(new Event('input'));
+            });
+        });
+
+        // 全螢幕切換
+        document.getElementById('fullscreen-btn').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => console.log(err));
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        });
+
+        // 頁面初次載入
+        updateDisplay();
+    </script>
+</body>
+</html>
